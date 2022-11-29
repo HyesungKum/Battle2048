@@ -20,6 +20,11 @@ public class BoardManager : MonoBehaviour
     bool GameEnd { get; set; }
     bool GameEndToken { get; set; }
 
+    public bool[] lineProcessing = new bool[4];
+
+    [Header("Effect")]
+    [SerializeField] GameObject eff = null;
+
     private void Awake()
     {
         GameEndToken = true;
@@ -40,7 +45,7 @@ public class BoardManager : MonoBehaviour
             }
         }
 
-        Make2DNodeBoard(4);
+        Make2DNodeBoard(boardSize);
     }
     void Start()
     {
@@ -55,27 +60,21 @@ public class BoardManager : MonoBehaviour
         {
             if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow))
             {
-                //오른쪽 관련 함수들 전부 수정중 ->
-                FindRightMatch();
+                SearchAndGenerateR();
             }
             else if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow))
             {
-                FindLeftMatch();
+                SearchAndGenerateL();
             }
             else if (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow))
             {
-                FindUpMatch();
+                SearchAndGenerateU();
             }
             else if (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow))
             {
-                FindDownMatch();
+                SearchAndGenerateD();
             }
         }
-
-        Debug.Log("process1" + Pro[0]);
-        Debug.Log("process2" + Pro[1]);
-        Debug.Log("process3" + Pro[2]);
-        Debug.Log("process4" + Pro[3]);
     }
 
     void Make2DNodeBoard(int size)
@@ -108,112 +107,41 @@ public class BoardManager : MonoBehaviour
         }
     }
 
-    public void FindRightMatch()
-    {
-        StartCoroutine(SearchAndGenerateR());
-    }
-    public void FindLeftMatch()
-    {
-        StartCoroutine(SearchAndGenerateL());
-    }
-    public void FindUpMatch()
-    {
-        //왼쪽 끝부터 시작
-        for (int i = 1; i < 5; i++)
-        {
-            StartCoroutine(SearchAndGenerateU());
-        }
-    }
-    public void FindDownMatch()
-    {
-        //아래 끝부터 시작
-        for (int i = 1; i < 5; i++)
-        {
-            StartCoroutine(SearchAndGenerateD());
-        }
-    }
-
-    public bool[] Pro = new bool[4];
-
     #region sync search routine & Generate routine
-    IEnumerator SearchAndGenerateR()
+    void SearchAndGenerateR()
     {
-        //오른쪽 끝부터 시작
         for (int i = 1; i < 5; i++)
         {
-            StartCoroutine(SearchR(node2Ds[i, 4], i-1));
-        }
-
-        //과정이 끝날때 까지 대기
-        yield return new WaitUntil(() => !Pro[0] && !Pro[1] && !Pro[2] && !Pro[3]);
-
-        Debug.Log("Hi");
-        //블록 생성
-        if (Moved && !Processing) Generate();
-
-        //EndGameControll
-        if (emptyNodes.Count == 0 && GameEndToken)
-        {
-            StartCoroutine(EndGameCheck());
+            StartCoroutine(SearchR(node2Ds[i, 4], i - 1));
         }
     }
-    IEnumerator SearchAndGenerateL()
+    void SearchAndGenerateL()
     {
-        //왼쪽 끝부터 시작
         for (int i = 1; i < 5; i++)
         {
-            yield return SearchL(node2Ds[i, 1]);
-        }
-
-        //블록 생성
-        if (Moved && !Processing) Generate();
-
-        //EndGameControll
-        if (emptyNodes.Count == 0 && GameEndToken)
-        {
-            StartCoroutine(EndGameCheck());
+            StartCoroutine(SearchL(node2Ds[i, 1], i - 1));
         }
     }
-    IEnumerator SearchAndGenerateU()
+    void SearchAndGenerateU()
     {
-        //위쪽 끝부터 시작
         for (int i = 1; i < 5; i++)
         {
-            yield return SearchU(node2Ds[1, i]);
-        }
-
-        //블록 생성
-        if (Moved && !Processing) Generate();
-
-        //EndGameControll
-        if (emptyNodes.Count == 0 && GameEndToken)
-        {
-            StartCoroutine(EndGameCheck());
+            StartCoroutine(SearchU(node2Ds[1, i], i - 1));
         }
     }
-    IEnumerator SearchAndGenerateD()
+    void SearchAndGenerateD()
     {
-        //위쪽 끝부터 시작
         for (int i = 1; i < 5; i++)
         {
-            yield return SearchD(node2Ds[4, i]);
-        }
-
-        //블록 생성
-        if (Moved && !Processing) Generate();
-
-        //EndGameControll
-        if (emptyNodes.Count == 0 && GameEndToken)
-        {
-            StartCoroutine(EndGameCheck());
+            StartCoroutine(SearchD(node2Ds[4, i], i - 1));
         }
     }
     #endregion
 
     #region search routine
-    public IEnumerator SearchR(Node2D targetNode, int processIndex)
+    public IEnumerator SearchR(Node2D targetNode, int index)
     {
-        Pro[processIndex] = true;
+        lineProcessing[index] = true;
 
         while (true)
         {
@@ -224,7 +152,14 @@ public class BoardManager : MonoBehaviour
                     targetNode = targetNode.Right;
                     targetNode.Combined = false;
                 }
-                Pro[processIndex] = false;
+                lineProcessing[index] = false;
+
+                //마지막 루틴이 끝날 때
+                if (index == 3 && Moved)
+                {
+                    Generate();
+                }
+
                 yield break;
             }
 
@@ -243,19 +178,16 @@ public class BoardManager : MonoBehaviour
                     targetNode.Value = 0;
                     targetNode.Empty = true;
                     emptyNodes.Add(targetNode);
-
                     //
-                    StartCoroutine(ObjectMove(targetNode.Unit.transform, Vector3.right));
+                    targetNode.Unit.transform.position += Vector3.right;
 
                     targetNode.Right.Unit = targetNode.Unit;
                     targetNode.Unit = null;
                     //
-
                     targetNode = targetNode.Right;
                     emptyNodes.Remove(targetNode);
 
                     Moved = true;
-
                     continue;
                 }
                 else
@@ -267,9 +199,13 @@ public class BoardManager : MonoBehaviour
                         targetNode.Right.Combined = true;
                         targetNode.Right.Value *= 2;
 
-                        GameManager.Inst.Score += targetNode.Right.Value;
+                        GameManager.Inst.Score += targetNode.Left.Value;
 
-                        //
+                        //effect
+                        GameObject obj2 = Instantiate(eff, targetNode.Right.Unit.transform.position + (Vector3.up * 0.5f), Quaternion.identity);
+                        Destroy(obj2, 1f);
+
+                        //object
                         Destroy(targetNode.Unit);
                         Destroy(targetNode.Right.Unit);
 
@@ -278,6 +214,7 @@ public class BoardManager : MonoBehaviour
 
                         targetNode.Right.Unit = newUnit;
                         //
+
                         targetNode.Empty = true;
                         targetNode.Value = 0;
 
@@ -286,6 +223,7 @@ public class BoardManager : MonoBehaviour
                         Moved = true;
 
                         targetNode = targetNode.Left;
+
                         continue;
                     }
                 }
@@ -295,9 +233,9 @@ public class BoardManager : MonoBehaviour
             yield return null;
         }
     }
-    public IEnumerator SearchL(Node2D targetNode)
+    public IEnumerator SearchL(Node2D targetNode, int index)
     {
-        Processing = true;
+        lineProcessing[index] = true;
 
         while (true)
         {
@@ -308,7 +246,14 @@ public class BoardManager : MonoBehaviour
                     targetNode = targetNode.Left;
                     targetNode.Combined = false;
                 }
-                Processing = false;
+                lineProcessing[index] = false;
+
+                //마지막 루틴이 끝날 때
+                if (index == 3 && Moved)
+                {
+                    Generate();
+                }
+
                 yield break;
             }
 
@@ -348,9 +293,13 @@ public class BoardManager : MonoBehaviour
                         targetNode.Left.Combined = true;
                         targetNode.Left.Value *= 2;
 
-                        GameManager.Inst.Score += targetNode.Left.Value;
+                        GameManager.Inst.Score += targetNode.Right.Value;
 
-                        //
+                        //effect
+                        GameObject obj = Instantiate(eff, targetNode.Left.Unit.transform.position + (Vector3.up * 0.5f), Quaternion.identity);
+                        Destroy(obj, 1f);
+
+                        //object
                         Destroy(targetNode.Unit);
                         Destroy(targetNode.Left.Unit);
 
@@ -372,14 +321,13 @@ public class BoardManager : MonoBehaviour
                     }
                 }
             }
-
             targetNode = targetNode.Right;
             yield return null;
         }
     }
-    public IEnumerator SearchU(Node2D targetNode)
+    public IEnumerator SearchU(Node2D targetNode, int index)
     {
-        Processing = true;
+        lineProcessing[index] = true;
 
         while (true)
         {
@@ -390,7 +338,14 @@ public class BoardManager : MonoBehaviour
                     targetNode = targetNode.Up;
                     targetNode.Combined = false;
                 }
-                Processing = false;
+                lineProcessing[index] = false;
+
+                //마지막 루틴이 끝날 때
+                if (index == 3 && Moved)
+                {
+                    Generate();
+                }
+
                 yield break;
             }
 
@@ -434,7 +389,11 @@ public class BoardManager : MonoBehaviour
 
                         GameManager.Inst.Score += targetNode.Up.Value;
 
-                        //
+                        //effect
+                        GameObject obj = Instantiate(eff, targetNode.Up.Unit.transform.position + (Vector3.up * 0.5f), Quaternion.identity);
+                        Destroy(obj, 1f);
+                        
+                        //object
                         Destroy(targetNode.Unit);
                         Destroy(targetNode.Up.Unit);
 
@@ -461,9 +420,9 @@ public class BoardManager : MonoBehaviour
             yield return null;
         }
     }
-    public IEnumerator SearchD(Node2D targetNode)
+    public IEnumerator SearchD(Node2D targetNode, int index)
     {
-        Processing = true;
+        lineProcessing[index] = true;
 
         while (true)
         {
@@ -474,7 +433,13 @@ public class BoardManager : MonoBehaviour
                     targetNode = targetNode.Down;
                     targetNode.Combined = false;
                 }
-                Processing = false;
+                lineProcessing[index] = false;
+
+                //마지막 루틴이 끝날 때
+                if (index == 3 && Moved)
+                {
+                    Generate();
+                }
                 yield break;
             }
 
@@ -516,8 +481,12 @@ public class BoardManager : MonoBehaviour
                         targetNode.Down.Value *= 2;
 
                         GameManager.Inst.Score += targetNode.Down.Value;
+                        
+                        //effect
+                        GameObject obj = Instantiate(eff, targetNode.Down.Unit.transform.position + (Vector3.up * 0.5f), Quaternion.identity);
+                        Destroy(obj, 1f);
 
-                        //
+                        //object
                         Destroy(targetNode.Unit);
                         Destroy(targetNode.Down.Unit);
 
@@ -547,17 +516,24 @@ public class BoardManager : MonoBehaviour
     #endregion
 
     #region Object Move
-
-    public IEnumerator ObjectMove(Transform targetTrans, Vector3 dir)
+    public IEnumerator ObjectMove(Transform targetTrans, Vector3 dir, int count)
     {
-        Vector3 oldPos = targetTrans.position;
+        if(count == 0)
+            yield break;
+
+        Vector3 fixedPos = targetTrans.position;
+        Vector3 desPos = targetTrans.position + (dir * count);
 
         while (true)
         {
-            targetTrans.Translate(dir * Time.deltaTime * 0.1f);
+            targetTrans.position = Vector3.Lerp(targetTrans.position, desPos, 0.1f);
 
-            if (targetTrans.position.x >= oldPos.x + dir.x)
+            fixedPos.x = Mathf.Round(targetTrans.position.x*10f)/10f;
+            fixedPos.z = Mathf.Round(targetTrans.position.z*10f)/10f;
+
+            if (desPos.Equals(fixedPos))
             {
+                targetTrans.position = desPos;
                 yield break;
             }
             yield return null;
@@ -584,6 +560,12 @@ public class BoardManager : MonoBehaviour
 
         emptyNodes[pickNum].Unit = newUnit;
         emptyNodes.RemoveAt(pickNum);
+
+        //EndGameControll
+        if (emptyNodes.Count == 0 && GameEndToken)
+        {
+            StartCoroutine(EndGameCheck());
+        }
     }
     #endregion
 

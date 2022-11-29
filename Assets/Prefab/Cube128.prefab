@@ -544,7 +544,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  - {fileID: 4323183062575816948, guid: 9d44b8fb00170cc42bd17d52ee91bded, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -588,8 +588,8 @@ MonoBehaviour:
       m_Calls: []
   m_text: 128
   m_isRightToLeft: 0
-  m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  m_fontAsset: {fileID: 11400000, guid: 9d44b8fb00170cc42bd17d52ee91bded, type: 2}
+  m_sharedMaterial: {fileID: 4323183062575816948, guid: 9d44b8fb00170cc42bd17d52ee91bded, type: 2}
   m_fontSharedMaterials: []
   m_fontMaterial: {fileID: 0}
   m_fontMaterials: []
@@ -1164,11 +1164,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7173915815415273453, guid: 3305db84c49add14db9bd82fccd5f23c, type: 3}
       propertyPath: m_AnchoredPosition.x
-      value: -0.2
+      value: -0.20000002
       objectReference: {fileID: 0}
     - target: {fileID: 7173915815415273453, guid: 3305db84c49add14db9bd82fccd5f23c, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: -0.000000007450581
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 7173915815415273453, guid: 3305db84c49add14db9bd82fccd5f23c, type: 3}
       propertyPath: m_LocalEulerAnglesHint.x
