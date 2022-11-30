@@ -1,0 +1,19 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5952d9b70f1d039409b519afffd80a8c, type: 3}
+  m_Name: UnitStat2048
+  m_EditorClassIdentifier: 
+  damage: 2048
+  enableVfx: {fileID: 9008978759565548883, guid: 9c81a6572296cf94688e67af954b020d, type: 3}
+  enableSfx: {fileID: 0}
+  disableVfx: {fileID: 0}
+  disableSfx: {fileID: 0}
