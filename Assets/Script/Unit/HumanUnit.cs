@@ -2,17 +2,20 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class HumanUnit : MonoBehaviour
-{
-    // Start is called before the first frame update
-    void Start()
+public class HumanUnit : BasicUnit
+{   
+    public enum Type
     {
-        
+        sheildman,
+        knight,
+        hero,
+        max
     }
 
-    // Update is called once per frame
-    void Update()
+    public Type type;
+
+    protected override void Awake()
     {
-        
+        base.Awake();
     }
 }

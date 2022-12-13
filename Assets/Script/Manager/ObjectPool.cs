@@ -4,53 +4,122 @@ using UnityEngine;
 
 public class ObjectPool : MonoSingleTon<ObjectPool>
 {
-    Dictionary<string, Queue<GameObject>> MainPool = null;
-    Queue<GameObject> SubPool = null;
-    GameObject instObj = null;
+    Dictionary<string, List<GameObject>> MainPool = null;
 
     private void Awake()
     {
         MainPool = new();
     }
 
+    /// <summary>
+    /// call object about object pool
+    /// </summary>
+    /// <param name="_object"></param>
+    /// <param name="pos"></param>
+    /// <param name="quat"></param>
+    /// <returns></returns>
     public GameObject ObjectPop(GameObject _object, Vector3 pos, Quaternion quat)
     {
         string key = _object.name.Split('(')[0];
 
-        if (MainPool.TryGetValue(key, out SubPool) && SubPool.Count < 1)
+        if (MainPool.TryGetValue(key, out List<GameObject> SubPool))
         {
-            this.instObj = SubPool.Dequeue();
+            if (SubPool.Count != 0)
+            {
+                GameObject instObj = SubPool[0];
+                SubPool.RemoveAt(0);
 
-            this.instObj.SetActive(true);
+                instObj.SetActive(true);
 
-            return this.instObj;
+                instObj.transform.SetPositionAndRotation(pos, quat);
+
+                return instObj;
+            }
+            else
+            {
+                GameObject instObj = Instantiate(_object, pos, quat);
+
+                instObj.SetActive(true);
+
+                return instObj;
+            }
         }
         else
         {
-            this.instObj = Instantiate(_object, pos, quat, this.transform);
+            GameObject instObj = instObj = Instantiate(_object, pos, quat);
 
-            this.instObj.SetActive(true);
-            this.instObj.transform.SetPositionAndRotation(pos, quat);
+            instObj.SetActive(true);
 
-            return this.instObj;
+            return instObj;
         }
     }
+    /// <summary>
+    /// call object about object pool
+    /// </summary>
+    /// <param name="_object"></param>
+    /// <param name="pos"></param>
+    /// <param name="quat"></param>
+    /// <param name="parent"></param>
+    /// <returns></returns>
+    public GameObject ObjectPop(GameObject _object, Vector3 pos, Quaternion quat, Transform parent)
+    {
+        string key = _object.name.Split('(')[0];
+
+        if (MainPool.TryGetValue(key, out List<GameObject> SubPool))
+        {
+            if (SubPool.Count != 0)
+            {
+                GameObject instObj = SubPool[0];
+                SubPool.RemoveAt(0);
+
+                instObj.SetActive(true);
+                
+                if(parent != null) instObj.transform.SetParent(parent);
+
+                instObj.transform.SetPositionAndRotation(pos, quat);
+
+                return instObj;
+            }
+            else
+            {
+                GameObject instObj = Instantiate(_object, pos, quat, parent);
+
+                instObj.SetActive(true);
+
+                return instObj;
+            }
+        }
+        else
+        {
+            GameObject instObj = instObj = Instantiate(_object, pos, quat, parent);
+
+            instObj.SetActive(true);
+
+            return instObj;
+        }
+    }
+
+    /// <summary>
+    /// object put in to object pool
+    /// </summary>
+    /// <param name="_object"></param>
     public void ObjectPush(GameObject _object)
     {
+        if (_object == null) return;
+
         string key = _object.name.Replace("(Clone)","");
 
-        if (MainPool.TryGetValue(key, out SubPool))
+        if (MainPool.TryGetValue(key, out List<GameObject> SubPool))
         {
-            this.SubPool.Enqueue(_object);
-
+            SubPool.Add(_object);
             _object.SetActive(false);
         }
         else
         {
-            _object.transform.position = Vector3.zero;
-
-            this.SubPool = new Queue<GameObject>();
-            this.SubPool.Enqueue(_object);
+            SubPool = new()
+            {
+                _object
+            };
 
             this.MainPool.Add(key, SubPool);
 

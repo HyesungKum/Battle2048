@@ -3,483 +3,715 @@ using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
 using UnityEngine.SceneManagement;
-
+using System;
 public class BoardManager : MonoBehaviour
 {
-    [Header("BoardSize")]
+    //====================Settings==============================
+    [Header("BoardSize=======================================")]
     [SerializeField] int boardSize = 4;
 
-    [Header("unit prefab")]
-    [SerializeField] List<GameObject> unit = null;
+    [Header("BoardEffect=====================================")]
+    AudioSource boardAudio = null;
+    [Header("move")]
+    [SerializeField] GameObject ObjBoardMoveVfx     = null;
+    ParticleSystem VfxBoardMove                     = null;
+    [SerializeField] AudioClip SfxMove              = null;
 
-    Node2D[,] node2Ds = null;
-    List<Node2D> emptyNodes = new List<Node2D>();
+    [Header("move fail")]
+    [SerializeField] GameObject ObjBoardMoveFailVfx = null;
+    ParticleSystem VfxBoardFail                     = null;
+    [SerializeField] AudioClip SfxMoveFail          = null;
 
-    WaitForSeconds waitTime = new WaitForSeconds(0.7f);
+    [Header("undo")]
+    [SerializeField] GameObject HourGlass           = null;
+    [SerializeField] GameObject[] ChanceLight       = null;
+    Animator HourGlassAnimator = null;
+    [SerializeField] GameObject ObjBoardUndoVfx     = null;
+    ParticleSystem VfxBoardUndo = null;
+    [SerializeField] AudioClip SfxUndo              = null;
+    [SerializeField] AudioClip SfxUndoFail          = null;
 
-    bool Processing { get; set; }
+    [Header("Unit Prefab=====================================")]
+    [SerializeField] List<MonsterUnit> units = null;
+
+    [Header("Obstacle Prefab=================================")]
+    [SerializeField] List<GameObject> obstaclesUnits = null;
+
+    [Header("Difficulty======================================")]
+    [SerializeField] int genBaseMonster = 2;
+    [SerializeField] int genEnemy = 2;
+    [SerializeField] int ObGenPercent = 10;
+    [SerializeField] int heroPercent = 1;
+    [SerializeField] int KnightPercent = 5;
+
+    [Header("Obstacle Objective Unit=========================")]
+    [SerializeField] MonsterUnit targetUnit = null;
+
+    [Header("debuging each node data=========================")]
+    #if UNITY_EDITOR
+    [SerializeField] bool showNodeUnit = false;
+    [Tooltip("Default Value 0")]
+    [SerializeField] int ForcedUnitIndex = 0;
+    [SerializeField] bool NoGen = false;
+    #endif
+
+    //===================node Data==============================
+    LinkedNode2D nodes2D           = null;
+    List<LinkedNode2D> recordNodes = new();
+    List<Node> emptyNodes          = new();
+
+    //==============board managing flag=========================
+    readonly WaitForSeconds waitTime = new(1f);
     bool Moved { get; set; }
-    bool GameEnd { get; set; }
+    bool Generated { get; set; }
+    bool Processing { get; set; }
+    bool UndoProcessing { get; set; }
+    bool[] lineProcessing = null;
+    int undoCount = 4;
+    int lightCount = 0;
+    int undoChance { get; set; }
 
-    public bool[] lineProcessing = new bool[4];
-
-    [Header("Effect")]
-    [SerializeField] GameObject eff = null;
-
-    private void Awake()
+    //====================main Logic============================
+    private void Awake()//initializing and board make
     {
+        #region debug state check
+        #if UNITY_EDITOR
+        if (
+                showNodeUnit ||
+                ForcedUnitIndex != 0 ||
+                NoGen
+           )
+        {
+            Debug.LogWarning("BoardManager Warning## Debug mode is not disabled!!!");
+        }
+#endif
+        #endregion
 
-        node2Ds = new Node2D[boardSize + 2, boardSize + 2];
+        //board undo vfx & sfx
+        lightCount = 0;
+        for (int i = 0; i < ChanceLight.Length; i++)
+        {
+            ChanceLight[i].SetActive(true);
+        }
+        HourGlassAnimator = HourGlass.GetComponent<Animator>();
+        VfxBoardUndo = ObjBoardUndoVfx.GetComponent<ParticleSystem>();
 
+        //board move vfx & sfx
+        VfxBoardMove = ObjBoardMoveVfx.GetComponentInChildren<ParticleSystem>();
+        VfxBoardFail = ObjBoardMoveFailVfx.GetComponentInChildren<ParticleSystem>();
+
+        //board move sound source
+        boardAudio = this.GetComponent<AudioSource>();
+        boardAudio.clip = SfxMove;
+
+        //init object pool
+        ObjectPool.Clear();
+
+        //processing initialize
+        undoChance = 0;
+        Generated = false;
+        UndoProcessing = false;
+        Processing = false;
+        lineProcessing = new bool[boardSize];
+
+        //assign node nodeData
+        nodes2D = new LinkedNode2D(boardSize);
+
+        //assign each node
         for (int y = 0; y < boardSize + 2; y++)
         {
             for (int x = 0; x < boardSize + 2; x++)
             {
-                node2Ds[y, x] = new Node2D();
-                if (0 < x && x < boardSize + 1 && 0 < y && y < boardSize + 1)
-                {
-                    node2Ds[y, x].XPos = x;
-                    node2Ds[y, x].YPos = y;
-                    emptyNodes.Add(node2Ds[y, x]);
-                }
+                nodes2D.nodes[y, x] = new Node();
             }
         }
 
-        Make2DNodeBoard(boardSize);
-    }
-    void Start()
-    {
-        //basic 2 block generate
-        Generate();
-        Generate();
-    }
-    
-    void Update()
-    {
-        //controll
-        if (!Processing)
+        //apply each node data
+        for (int y = 0; y < boardSize + 2; y++)
         {
-            if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow))
+            for (int x = 0; x < boardSize + 2; x++)
             {
-                SearchAndGenerateR();
-            }
-            else if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow))
-            {
-                SearchAndGenerateL();
-            }
-            else if (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow))
-            {
-                SearchAndGenerateU();
-            }
-            else if (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow))
-            {
-                SearchAndGenerateD();
-            }
-        }
-    }
+                //input coordinate
+                nodes2D.nodes[y, x].XPos = x;
+                nodes2D.nodes[y, x].YPos = y;
 
-    void Make2DNodeBoard(int size)
-    {
-        //create 4 by 4 node array
-        for (int y = 0; y < size + 2; y++)
-        {
-            for (int x = 0; x < size + 2; x++)
-            {
                 //create wall
-                if (x == 0 || x == size + 1 || y == 0 || y == size + 1)
+                if (x == 0 || x == boardSize + 1 || y == 0 || y == boardSize + 1)
                 {
-                    node2Ds[x, y].Wall = true;
+                    nodes2D.nodes[x, y].SetWall();
 
                     //exception
-                    if (x == 0) node2Ds[y, x].Right = node2Ds[y, x + 1];
-                    else if (x == size + 1) node2Ds[y, x].Left = node2Ds[y, x - 1];
-                    else if (y == 0) node2Ds[y, x].Down = node2Ds[y + 1, x];
-                    else if (y == size + 1) node2Ds[y, x].Up = node2Ds[y - 1, x];
+                    if (x == 0) nodes2D.nodes[y, x].Right = nodes2D.nodes[y, x + 1];
+                    else if (x == boardSize + 1) nodes2D.nodes[y, x].Left = nodes2D.nodes[y, x - 1];
+                    else if (y == 0) nodes2D.nodes[y, x].Down = nodes2D.nodes[y + 1, x];
+                    else if (y == boardSize + 1) nodes2D.nodes[y, x].Up = nodes2D.nodes[y - 1, x];
                 }
                 else
                 {
                     //1~4 node connection
-                    node2Ds[y, x].Left = node2Ds[y, x - 1];
-                    node2Ds[y, x].Right = node2Ds[y, x + 1];
-                    node2Ds[y, x].Up = node2Ds[y - 1, x];
-                    node2Ds[y, x].Down = node2Ds[y + 1, x];
+                    nodes2D.nodes[y, x].Left = nodes2D.nodes[y, x - 1];
+                    nodes2D.nodes[y, x].Right = nodes2D.nodes[y, x + 1];
+                    nodes2D.nodes[y, x].Up = nodes2D.nodes[y - 1, x];
+                    nodes2D.nodes[y, x].Down = nodes2D.nodes[y + 1, x];
+
+                    //empty node apply
+                    emptyNodes.Add(nodes2D.nodes[y, x]);
                 }
             }
         }
     }
+    void Start()//initial block generate
+    {
+        for(int i =0; i< genEnemy; i++)
+        {
+            GenerateObstracle();
+        }
+        for (int i = 0; i < genBaseMonster; i++)
+        {
+            GenerateBaseUnit();
+        }
 
-    #region sync search routine & Generate routine
+        RecordingNodes(nodes2D);
+    }
+    void Update()//input controll
+    {
+        if (GameManager.Inst.GameEnd) return;
+
+        if (!Processing && !lineProcessing[0] && !lineProcessing[1] && !lineProcessing[2] && !lineProcessing[3] && !UndoProcessing)
+        {
+            if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow))
+            {
+                SearchAndGenerateR();
+                RecordingNodes(nodes2D);
+            }
+            else if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow))
+            {
+                SearchAndGenerateL();
+                RecordingNodes(nodes2D);
+            }
+            else if (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow))
+            {
+                SearchAndGenerateU();
+                RecordingNodes(nodes2D);
+            }
+            else if (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow))
+            {
+                SearchAndGenerateD();
+                RecordingNodes(nodes2D);
+            }
+        }
+
+        if (Input.GetKeyDown(KeyCode.Q) && !UndoProcessing)
+        {
+            if (recordNodes.Count > 1)
+            {
+                GameManager.Inst.TimeStop = true;
+
+                ChanceLight[lightCount].SetActive(false);
+                UndoProcessing = true;
+                UndoControll();
+                boardAudio.clip = SfxUndo;
+                boardAudio.Play();
+                Invoke(nameof(CallRecordNodes), 2f);
+                lightCount++;
+            }
+            else
+            {
+                //undo fail production
+                //dir next insert movedfail sfx
+            }
+            #region debuging routine
+            #if UNITY_EDITOR
+            if (showNodeUnit)
+            {
+                Debug.Log($"{nodes2D.nodes[1, 1].nodeData.Unit,80}|{nodes2D.nodes[1, 2].nodeData.Unit,80}|{nodes2D.nodes[1, 3].nodeData.Unit,80}|{nodes2D.nodes[1, 4].nodeData.Unit,80}");
+                Debug.Log($"{nodes2D.nodes[2, 1].nodeData.Unit,80}|{nodes2D.nodes[2, 2].nodeData.Unit,80}|{nodes2D.nodes[2, 3].nodeData.Unit,80}|{nodes2D.nodes[2, 4].nodeData.Unit,80}");
+                Debug.Log($"{nodes2D.nodes[3, 1].nodeData.Unit,80}|{nodes2D.nodes[3, 2].nodeData.Unit,80}|{nodes2D.nodes[3, 3].nodeData.Unit,80}|{nodes2D.nodes[3, 4].nodeData.Unit,80}");
+                Debug.Log($"{nodes2D.nodes[4, 1].nodeData.Unit,80}|{nodes2D.nodes[4, 2].nodeData.Unit,80}|{nodes2D.nodes[4, 3].nodeData.Unit,80}|{nodes2D.nodes[4, 4].nodeData.Unit,80}");
+                Debug.Log($"empty node count : {emptyNodes.Count}");
+                Debug.Log($"Undo List Count : {recordNodes.Count}");
+                Debug.Log($"Undo Chance : {undoChance}");
+                Debug.Log("==================================================");
+            }
+            #endif
+            #endregion
+        }
+    }
+
+    #region board vfx sfx production
+    void DirArrowControll(Vector3 dir)
+    {
+        ObjBoardMoveVfx.transform.forward = dir;
+        VfxBoardMove.Play();
+        boardAudio.clip = SfxMove;
+        boardAudio.Play();
+    }
+    void UndoControll()
+    {
+        HourGlassAnimator.SetTrigger("Turn");
+        VfxBoardUndo.Play();
+    }
+    #endregion
+
+    #region Line Search routine
     void SearchAndGenerateR()
     {
-        for (int i = 1; i < 5; i++)
+        for (int i = 1; i < boardSize + 1; i++)
         {
-            StartCoroutine(SearchR(node2Ds[i, 4], i - 1));
+            StartCoroutine(SearchR(nodes2D.nodes[i, boardSize], i - 1));
         }
     }
     void SearchAndGenerateL()
     {
-        for (int i = 1; i < 5; i++)
+        for (int i = 1; i < boardSize + 1; i++)
         {
-            StartCoroutine(SearchL(node2Ds[i, 1], i - 1));
+            StartCoroutine(SearchL(nodes2D.nodes[i, 1], i - 1));
         }
     }
     void SearchAndGenerateU()
     {
-        for (int i = 1; i < 5; i++)
+        for (int i = 1; i < boardSize + 1; i++)
         {
-            StartCoroutine(SearchU(node2Ds[1, i], i - 1));
+            StartCoroutine(SearchU(nodes2D.nodes[1, i], i - 1));
         }
     }
     void SearchAndGenerateD()
     {
-        for (int i = 1; i < 5; i++)
+        for (int i = 1; i < boardSize + 1; i++)
         {
-            StartCoroutine(SearchD(node2Ds[4, i], i - 1));
+            StartCoroutine(SearchD(nodes2D.nodes[boardSize, i], i - 1));
         }
     }
     #endregion
 
     #region search routine
-    public IEnumerator SearchR(Node2D targetNode, int index)
+    public IEnumerator SearchR(Node targetNode, int routineCount)
     {
-        lineProcessing[index] = true;
+        //processing flag on
+        lineProcessing[routineCount] = true;
 
+        //search routine
         while (true)
         {
-            if (targetNode.Wall)
+            if (targetNode.nodeData.Wall)
             {
-                for (int i = 0; i < 4; i++)
+                for (int i = 0; i < boardSize; i++)
                 {
                     targetNode = targetNode.Right;
-                    targetNode.Combined = false;
+                    targetNode.nodeData.Combined = false;
                 }
-                lineProcessing[index] = false;
+                lineProcessing[routineCount] = false;
 
-                //마지막 루틴이 끝날 때
-                if (index == 3 && Moved)
+                if (routineCount == boardSize - 1 && Moved)
                 {
-                    Generate();
+                    yield return new WaitUntil(() => !lineProcessing[0] && !lineProcessing[1] && !lineProcessing[2] && !lineProcessing[3]);
+
+                    GenerateBaseUnit();
+
+                    DirArrowControll(Vector3.right);
+                    RecordingNodes(nodes2D);
+                }
+                else if(routineCount == boardSize - 1)
+                {
+                    VfxBoardFail.Play();
                 }
 
                 yield break;
             }
 
-            if (!targetNode.Empty)
+            //targetnode full
+            if (targetNode.nodeData.Unit)
             {
-                if (targetNode.Right.Wall || targetNode.Right.Combined)//stop
+                if (targetNode.Right.nodeData.Wall || targetNode.Right.nodeData.Combined)
                 {
                     targetNode = targetNode.Left;
                     continue;
                 }
-                else if (targetNode.Right.Empty)//move
+                else if (!targetNode.Right.nodeData.Unit)//move
                 {
-                    targetNode.Right.Value = targetNode.Value;
-                    targetNode.Right.Empty = false;
+                    targetNode.nodeData.Unit.gameObject.transform.position += Vector3.right;
 
-                    targetNode.Value = 0;
-                    targetNode.Empty = true;
+                    (targetNode.nodeData, targetNode.Right.nodeData) = (targetNode.Right.nodeData, targetNode.nodeData);
                     emptyNodes.Add(targetNode);
-                    //
-                    targetNode.Unit.transform.position += Vector3.right;
-
-                    targetNode.Right.Unit = targetNode.Unit;
-                    targetNode.Unit = null;
-                    //
-                    targetNode = targetNode.Right;
-                    emptyNodes.Remove(targetNode);
+                    emptyNodes.Remove(targetNode.Right);
 
                     Moved = true;
+                    targetNode = targetNode.Right;
                     continue;
                 }
-                else
-                {
-                    if (targetNode.Value == targetNode.Right.Value)//combine
-                    {
-                        targetNode.Right.Combined = true;
-                        targetNode.Right.Value *= 2;
-
-                        GameManager.Inst.Score += targetNode.Left.Value;
-
-                        //object
-                        ObjectPool.Inst.ObjectPush(targetNode.Unit);
-                        ObjectPool.Inst.ObjectPush(targetNode.Right.Unit);
-
-                        Vector3 newUnitPos = new Vector3(targetNode.Right.XPos, 0.5f, -targetNode.Right.YPos);
-                        targetNode.Right.Unit = ObjectPool.Inst.ObjectPop(unit[targetNode.Right.GetUnitIndex], newUnitPos, Quaternion.identity);
-                        //
-
-                        targetNode.Empty = true;
-                        targetNode.Value = 0;
-
-                        emptyNodes.Add(targetNode);
-
-                        Moved = true;
-
-                        targetNode = targetNode.Left;
-
-                        continue;
-                    }
-                }
+                else CompareUnit(targetNode, targetNode.Right);
             }
-
             targetNode = targetNode.Left;
             yield return null;
         }
     }
-    public IEnumerator SearchL(Node2D targetNode, int index)
+    public IEnumerator SearchL(Node targetNode, int routineCount)
     {
-        lineProcessing[index] = true;
+        lineProcessing[routineCount] = true;
 
         while (true)
         {
-            if (targetNode.Wall)
+            //search routine ending
+            if (targetNode.nodeData.Wall)
             {
-                for (int i = 0; i < 4; i++)
+                for (int i = 0; i < boardSize; i++)
                 {
                     targetNode = targetNode.Left;
-                    targetNode.Combined = false;
+                    targetNode.nodeData.Combined = false;
                 }
-                lineProcessing[index] = false;
+                lineProcessing[routineCount] = false;
 
-                //마지막 루틴이 끝날 때
-                if (index == 3 && Moved)
+                if (routineCount == boardSize - 1 && Moved)
                 {
-                    Generate();
-                }
+                    yield return new WaitUntil(() => !lineProcessing[0] && !lineProcessing[1] && !lineProcessing[2] && !lineProcessing[3]);
+                    GenerateBaseUnit();
 
+                    DirArrowControll(Vector3.left);
+                    RecordingNodes(nodes2D);
+                }
+                else if (routineCount == boardSize - 1)
+                {
+                    VfxBoardFail.Play();
+                }
                 yield break;
             }
 
-            if (!targetNode.Empty)
+            if (targetNode.nodeData.Unit)
             {
-                if (targetNode.Left.Wall || targetNode.Left.Combined)//stop
+                if (targetNode.Left.nodeData.Wall || targetNode.Left.nodeData.Combined)//skip testing
                 {
                     targetNode = targetNode.Right;
                     continue;
                 }
-                else if (targetNode.Left.Empty)//move
+                else if (!targetNode.Left.nodeData.Unit)//move
                 {
-                    targetNode.Left.Value = targetNode.Value;
-                    targetNode.Left.Empty = false;
+                    targetNode.nodeData.Unit.gameObject.transform.position += Vector3.left;
 
-                    targetNode.Value = 0;
-                    targetNode.Empty = true;
+                    (targetNode.nodeData, targetNode.Left.nodeData) = (targetNode.Left.nodeData, targetNode.nodeData);
                     emptyNodes.Add(targetNode);
-                    //
-                    targetNode.Unit.transform.position += Vector3.left;
-
-                    targetNode.Left.Unit = targetNode.Unit;
-                    targetNode.Unit = null;
-                    //
-                    targetNode = targetNode.Left;
-                    emptyNodes.Remove(targetNode);
+                    emptyNodes.Remove(targetNode.Left);
 
                     Moved = true;
+                    targetNode = targetNode.Left;
                     continue;
                 }
-                else
-                {
-                    if (targetNode.Value == targetNode.Left.Value)//combine
-                    {
-                        targetNode.Left.Combined = true;
-                        targetNode.Left.Value *= 2;
-
-                        GameManager.Inst.Score += targetNode.Right.Value;
-
-                        //object
-                        ObjectPool.Inst.ObjectPush(targetNode.Unit);
-                        ObjectPool.Inst.ObjectPush(targetNode.Left.Unit);
-
-                        Vector3 newUnitPos = new Vector3(targetNode.Left.XPos, 0.5f, -targetNode.Left.YPos);
-                        targetNode.Left.Unit = ObjectPool.Inst.ObjectPop(unit[targetNode.Left.GetUnitIndex], newUnitPos, Quaternion.identity);
-                        //
-
-                        targetNode.Empty = true;
-                        targetNode.Value = 0;
-
-                        emptyNodes.Add(targetNode);
-
-                        Moved = true;
-
-                        targetNode = targetNode.Right;
-                        continue;
-                    }
-                }
+                else CompareUnit(targetNode, targetNode.Left);
             }
             targetNode = targetNode.Right;
             yield return null;
         }
     }
-    public IEnumerator SearchU(Node2D targetNode, int index)
+    public IEnumerator SearchU(Node targetNode, int routineCount)
     {
-        lineProcessing[index] = true;
+        lineProcessing[routineCount] = true;
 
+        //search routine
         while (true)
         {
-            if (targetNode.Wall)
+            if (targetNode.nodeData.Wall)
             {
-                for (int i = 0; i < 4; i++)
+                for (int i = 0; i < boardSize; i++)
                 {
                     targetNode = targetNode.Up;
-                    targetNode.Combined = false;
+                    targetNode.nodeData.Combined = false;
                 }
-                lineProcessing[index] = false;
+                lineProcessing[routineCount] = false;
 
-                //마지막 루틴이 끝날 때
-                if (index == 3 && Moved)
+                if (routineCount == boardSize - 1 && Moved)
                 {
-                    Generate();
-                }
+                    yield return new WaitUntil(() => !lineProcessing[0] && !lineProcessing[1] && !lineProcessing[2] && !lineProcessing[3]);
+                    GenerateBaseUnit();
 
+                    DirArrowControll(Vector3.forward);
+                    RecordingNodes(nodes2D);
+                }
+                else if (routineCount == boardSize - 1)
+                {
+                    VfxBoardFail.Play();
+                }
                 yield break;
             }
 
-            if (!targetNode.Empty)
+            //targetnode full
+            if (targetNode.nodeData.Unit)
             {
-                if (targetNode.Up.Wall || targetNode.Up.Combined)//stop
+                if (targetNode.Up.nodeData.Wall || targetNode.Up.nodeData.Combined)//skip testing
                 {
                     targetNode = targetNode.Down;
                     continue;
                 }
-                else if (targetNode.Up.Empty)//move
+                else if (!targetNode.Up.nodeData.Unit)//move
                 {
-                    targetNode.Up.Value = targetNode.Value;
-                    targetNode.Up.Empty = false;
+                    targetNode.nodeData.Unit.gameObject.transform.position += Vector3.forward;
 
-                    targetNode.Value = 0;
-                    targetNode.Empty = true;
-
+                    (targetNode.nodeData, targetNode.Up.nodeData) = (targetNode.Up.nodeData, targetNode.nodeData);
                     emptyNodes.Add(targetNode);
-                    //
-                    targetNode.Unit.transform.position += Vector3.forward;
-
-                    targetNode.Up.Unit = targetNode.Unit;
-                    targetNode.Unit = null;
-                    //
-                    targetNode = targetNode.Up;
-                    emptyNodes.Remove(targetNode);
+                    emptyNodes.Remove(targetNode.Up);
 
                     Moved = true;
-
+                    targetNode = targetNode.Up;
                     continue;
                 }
-                else
-                {
-                    if (targetNode.Value == targetNode.Up.Value)//combine
-                    {
-                        targetNode.Up.Combined = true;
-                        targetNode.Up.Value *= 2;
-
-                        GameManager.Inst.Score += targetNode.Up.Value;
-
-                        //object
-                        ObjectPool.Inst.ObjectPush(targetNode.Unit);
-                        ObjectPool.Inst.ObjectPush(targetNode.Up.Unit);
-
-                        Vector3 newUnitPos = new Vector3(targetNode.Up.XPos, 0.5f, -targetNode.Up.YPos);
-                        targetNode.Up.Unit = ObjectPool.Inst.ObjectPop(unit[targetNode.Up.GetUnitIndex], newUnitPos, Quaternion.identity);
-                        //
-
-                        targetNode.Empty = true;
-                        targetNode.Value = 0;
-
-                        emptyNodes.Add(targetNode);
-
-                        Moved = true;
-
-                        targetNode = targetNode.Down;
-                        continue;
-                    }
-                }
+                //검사노드 왼쪽에 무언가 있음
+                else CompareUnit(targetNode, targetNode.Up);
             }
-
             targetNode = targetNode.Down;
             yield return null;
         }
     }
-    public IEnumerator SearchD(Node2D targetNode, int index)
+    public IEnumerator SearchD(Node targetNode, int routineCount)
     {
-        lineProcessing[index] = true;
+        lineProcessing[routineCount] = true; //processing flag on
 
         while (true)
         {
-            if (targetNode.Wall)
+            //search routine ending
+            if (targetNode.nodeData.Wall)
             {
-                for (int i = 0; i < 4; i++)
+                for (int i = 0; i < boardSize; i++)
                 {
                     targetNode = targetNode.Down;
-                    targetNode.Combined = false;
+                    targetNode.nodeData.Combined = false;
                 }
-                lineProcessing[index] = false;
+                lineProcessing[routineCount] = false;
 
-                //마지막 루틴이 끝날 때
-                if (index == 3 && Moved)
+                //last routine
+                if (routineCount == boardSize - 1 && Moved )
                 {
-                    Generate();
+                    //캐싱 실험하기
+                    yield return new WaitUntil(() => !lineProcessing[0] && !lineProcessing[1] && !lineProcessing[2] && !lineProcessing[3]);
+                    
+                    GenerateBaseUnit();
+
+                    DirArrowControll(Vector3.back);
+                    RecordingNodes(nodes2D);
+                }
+                else if (routineCount == boardSize - 1)
+                {
+                    VfxBoardFail.Play();
                 }
                 yield break;
             }
 
-            if (!targetNode.Empty)
+            //targetnode full
+            if (targetNode.nodeData.Unit)
             {
-                if (targetNode.Down.Wall || targetNode.Down.Combined)//stop
+                if (targetNode.Down.nodeData.Wall || targetNode.Down.nodeData.Combined)//skip testing
                 {
                     targetNode = targetNode.Up;
                     continue;
                 }
-                else if (targetNode.Down.Empty)//move
+                else if (!targetNode.Down.nodeData.Unit)//move when down empty
                 {
-                    targetNode.Down.Value = targetNode.Value;
-                    targetNode.Down.Empty = false;
+                    targetNode.nodeData.Unit.gameObject.transform.position += Vector3.back;
 
-                    targetNode.Value = 0;
-                    targetNode.Empty = true;
+                    //transfer node data target -> down
+                    (targetNode.nodeData, targetNode.Down.nodeData) = (targetNode.Down.nodeData, targetNode.nodeData);
 
+                    //empty node controll
                     emptyNodes.Add(targetNode);
-                    //
-                    targetNode.Unit.transform.position += Vector3.back;
+                    emptyNodes.Remove(targetNode.Down);
 
-                    targetNode.Down.Unit = targetNode.Unit;
-                    targetNode.Unit = null;
-                    //
                     targetNode = targetNode.Down;
-                    emptyNodes.Remove(targetNode);
-
                     Moved = true;
                     continue;
                 }
-                else
-                {
-                    if (targetNode.Value == targetNode.Down.Value)//combine
-                    {
-                        targetNode.Down.Combined = true;
-                        targetNode.Down.Value *= 2;
-
-                        GameManager.Inst.Score += targetNode.Down.Value;
-
-                        //object
-                        ObjectPool.Inst.ObjectPush(targetNode.Unit);
-                        ObjectPool.Inst.ObjectPush(targetNode.Down.Unit);
-
-                        Vector3 newUnitPos = new Vector3(targetNode.Down.XPos, 0.5f, -targetNode.Down.YPos);
-                        targetNode.Down.Unit = ObjectPool.Inst.ObjectPop(unit[targetNode.Down.GetUnitIndex], newUnitPos, Quaternion.identity);
-                        //
-
-                        targetNode.Empty = true;
-                        targetNode.Value = 0;
-
-                        emptyNodes.Add(targetNode);
-
-                        Moved = true;
-
-                        targetNode = targetNode.Up;
-                        continue;
-                    }
-                }
+                else CompareUnit(targetNode, targetNode.Down);
             }
-
             targetNode = targetNode.Up;
             yield return null;
+        }
+    }
+    private void CompareUnit(Node targetNode, Node CompareNode)
+    {
+        BasicUnit targetUnit = targetNode.nodeData.Unit;
+        BasicUnit CompareUnit = CompareNode.nodeData.Unit;
+
+        if (!targetUnit.combinable) return;
+
+        if (targetUnit.spcies == CompareUnit.spcies)
+        {
+            //combine
+            if (targetUnit.GetDamage() == CompareUnit.GetDamage())
+            {
+                if (targetUnit.LastUnit) return;
+
+                int unitIndex = CompareNode.GetUnitIndex() + 1;
+
+                if (unitIndex == units.Count - 1) GameManager.Inst.ClearEvent(); //clear when last index unit appear
+
+                ObjectPool.Inst.ObjectPush(targetNode.GetUnit());
+                ObjectPool.Inst.ObjectPush(CompareNode.GetUnit());
+
+                Vector3 newUnitPos = new(CompareNode.XPos, 0.5f, -CompareNode.YPos);
+                GameObject unitObj;
+
+                //select combined unit species 
+                if (targetUnit.spcies == BasicUnit.Spcies.Monster)
+                {
+                    unitObj = units[unitIndex].gameObject;
+                    GameManager.Inst.MgrCallGameScore(units[unitIndex].GetDamage());
+                }
+                else unitObj = obstaclesUnits[unitIndex];
+
+                GameObject instUnit = ObjectPool.Inst.ObjectPop(unitObj, newUnitPos, Quaternion.identity, null);
+                CompareNode.nodeData.Unit = instUnit.GetComponent<BasicUnit>();
+
+                emptyNodes.Remove(CompareNode);
+                emptyNodes.Add(targetNode);
+
+                Moved = true;
+                CompareNode.nodeData.Combined = true;
+            }
+            else return; //if same spcies, not same damage return
+        }
+        else
+        {
+            #region dummy node data save
+            Node humNode;
+            Node monNode;
+            HumanUnit humanUnit;
+            MonsterUnit monsterUnit;
+
+            //unit apply each spcies
+            if (targetUnit.spcies == BasicUnit.Spcies.Human)
+            {
+                humNode = targetNode;
+                monNode = CompareNode;
+
+                humanUnit = (HumanUnit)targetUnit;
+                monsterUnit = (MonsterUnit)CompareUnit;
+            }
+            else
+            {
+                humNode = CompareNode;
+                monNode = targetNode;
+
+                monsterUnit = (MonsterUnit)targetUnit;
+                humanUnit = (HumanUnit)CompareUnit;
+            }
+            #endregion
+
+            switch (humanUnit.type)
+            {
+                case HumanUnit.Type.sheildman:
+                    {
+                        if (humanUnit.GetDamage() >= monsterUnit.GetDamage()) return;
+                        //die
+                        else
+                        {
+                            monsterUnit.gameObject.transform.position = CompareUnit.transform.position;
+                            humanUnit.gameObject.transform.position = CompareUnit.transform.position;
+
+                            humanUnit.DeadProd();
+
+                            Data dummyHumData = humNode.nodeData;
+                            Data dummyMonData = monNode.nodeData;
+
+                            //human dead monster alive
+                            CompareNode.nodeData = dummyMonData;
+                            targetNode.nodeData = dummyHumData;
+
+                            ObjectPool.Inst.ObjectPush(targetNode.GetUnit());
+
+                            emptyNodes.Remove(CompareNode);
+                            emptyNodes.Add(targetNode);
+
+                            Moved = true;
+                            CompareNode.nodeData.Combined = true;
+                        }
+                    }
+                    break;
+                case HumanUnit.Type.knight:
+                    {
+                        //kill monster unit damage 2
+                        if (monsterUnit.GetDamage() == 2)
+                        {
+                            monsterUnit.gameObject.transform.position = CompareUnit.transform.position;
+                            humanUnit.gameObject.transform.position = CompareUnit.transform.position;
+
+                            monsterUnit.DeadProd();
+
+                            Data dummyHumData = humNode.nodeData;
+                            Data dummyMonData = monNode.nodeData;
+
+                            CompareNode.nodeData = dummyHumData;
+                            targetNode.nodeData = dummyMonData;
+
+                            ObjectPool.Inst.ObjectPush(targetNode.GetUnit());
+
+                            emptyNodes.Remove(CompareNode);
+                            emptyNodes.Add(targetNode);
+
+                            Moved = true;
+                            CompareNode.nodeData.Combined = true;
+                        }
+                        //divide unit and alive
+                        else if (humanUnit.GetDamage() >= monsterUnit.GetDamage())
+                        {
+                            int unitIndex = monNode.GetUnitIndex() - 1;
+                            Vector3 monPos = new(monNode.XPos, 0.5f, monNode.YPos);
+
+                            monsterUnit.DownGradeProd();
+
+                            ObjectPool.Inst.ObjectPush(monNode.GetUnit());
+                            GameObject instUnit = ObjectPool.Inst.ObjectPop(units[unitIndex].gameObject, monPos, Quaternion.identity, null);
+                            monNode.nodeData.Unit = instUnit.GetComponent<BasicUnit>();
+
+                            monNode.nodeData.Combined = true;
+                            humNode.nodeData.Combined = true;
+                            Moved = true;
+                        }
+                        //divide monster unit and die
+                        else
+                        {
+                            int unitIndex = monNode.GetUnitIndex() - 1;
+                            Vector3 Pos = new(CompareNode.XPos,0.5f,CompareNode.YPos);
+
+                            monsterUnit.DownGradeProd();
+                            humanUnit.DeadProd();
+
+                            ObjectPool.Inst.ObjectPush(targetNode.GetUnit());
+                            ObjectPool.Inst.ObjectPush(CompareNode.GetUnit());
+                            
+                            GameObject instUnit = ObjectPool.Inst.ObjectPop(units[unitIndex].gameObject, Pos, Quaternion.identity, null);
+                            CompareNode.nodeData.Unit = instUnit.GetComponent<BasicUnit>();
+
+                            //empty node controll
+                            emptyNodes.Remove(targetNode);
+                            emptyNodes.Add(CompareNode);
+
+                            //flags
+                            CompareNode.nodeData.Combined = true;
+                            Moved = true;
+                        }
+                    }
+                    break;
+                case HumanUnit.Type.hero:
+                    {
+                        Debug.Log($"monster {monsterUnit.GetDamage()}");
+                        Debug.Log($"human {humanUnit.GetDamage()}");
+
+                        //kill large monster
+                        if (monsterUnit.GetDamage() >= humanUnit.GetDamage())
+                        {
+                            Debug.Log("hi");
+                            humanUnit.DeadProd();
+                            monsterUnit.DeadProd();
+
+                            ObjectPool.Inst.ObjectPush(targetNode.GetUnit());
+                            ObjectPool.Inst.ObjectPush(CompareNode.GetUnit());
+
+                            emptyNodes.Remove(targetNode);
+                            emptyNodes.Remove(CompareNode);
+
+                            CompareNode.nodeData.Combined = true;
+                            Moved = true;
+                        }
+                        else return; //egnore
+                    }
+                    break;
+            }
         }
     }
     #endregion
@@ -508,112 +740,212 @@ public class BoardManager : MonoBehaviour
             yield return null;
         }
     }
-
     #endregion
 
     #region generate routine
-    void Generate()
+    void GenerateBaseUnit()
     {
-        //logic
+        #region Debug
+        #if UNITY_EDITOR
+        if (NoGen) return;
+        #endif
+        #endregion
+        //empty node controll
         if (emptyNodes.Count == 0) return;
-        int pickNum = Random.Range(0, emptyNodes.Count);
-
-        emptyNodes[pickNum].Value = 2;
-        emptyNodes[pickNum].Empty = false;
 
         Moved = false;
-
+        int pickNum = UnityEngine.Random.Range(0, emptyNodes.Count);
         //object create
-        Vector3 newUnitPos = new Vector3(emptyNodes[pickNum].XPos, 0.5f, -emptyNodes[pickNum].YPos);
-        
-        emptyNodes[pickNum].Unit = ObjectPool.Inst.ObjectPop(unit[0], newUnitPos, Quaternion.identity);
+        Vector3 newUnitPos = new(emptyNodes[pickNum].XPos, 0.5f, -emptyNodes[pickNum].YPos);
+
+        float rand = UnityEngine.Random.Range(1, 10);
+
+        #region Debug Forced Unit Generation
+        #if UNITY_EDITOR
+        if (ForcedUnitIndex != 0)
+        {
+            GameObject instUnit = ObjectPool.Inst.ObjectPop(units[(int)ForcedUnitIndex].gameObject, newUnitPos, Quaternion.identity, null);
+            emptyNodes[pickNum].nodeData.Unit = instUnit.GetComponent<BasicUnit>();
+        }
+        else
+        #endif
+        #endregion
+
+        //create2
+        if (rand != 1)
+        {
+            GameObject instUnit = ObjectPool.Inst.ObjectPop(units[0].gameObject, newUnitPos, Quaternion.identity, null);
+            emptyNodes[pickNum].nodeData.Unit = instUnit.GetComponent<BasicUnit>();
+        }
+        //create4
+        else
+        {
+            GameObject instUnit = ObjectPool.Inst.ObjectPop(units[1].gameObject, newUnitPos, Quaternion.identity, null);
+            emptyNodes[pickNum].nodeData.Unit = instUnit.GetComponent<BasicUnit>();
+        }
+
         emptyNodes.RemoveAt(pickNum);
 
+
         //EndGameControll
-        if (emptyNodes.Count == 0)
+        if (emptyNodes.Count >= 2)
         {
-            StartCoroutine(EndGameCheck());
+            //generate obstacle
+            if (UnityEngine.Random.Range(1, 100) <= ObGenPercent)
+            {
+                GenerateObstracle();
+            }
         }
+        else if (emptyNodes.Count == 0)
+        {
+            StartCoroutine(GameOverCheck());
+        }
+
+        #region debuging routine
+        #if UNITY_EDITOR
+        if (showNodeUnit)
+        {
+            Debug.Log($"{nodes2D.nodes[1, 1].nodeData.Unit,80}|{nodes2D.nodes[1, 2].nodeData.Unit,80}|{nodes2D.nodes[1, 3].nodeData.Unit,80}|{nodes2D.nodes[1, 4].nodeData.Unit,80}");
+            Debug.Log($"{nodes2D.nodes[2, 1].nodeData.Unit,80}|{nodes2D.nodes[2, 2].nodeData.Unit,80}|{nodes2D.nodes[2, 3].nodeData.Unit,80}|{nodes2D.nodes[2, 4].nodeData.Unit,80}");
+            Debug.Log($"{nodes2D.nodes[3, 1].nodeData.Unit,80}|{nodes2D.nodes[3, 2].nodeData.Unit,80}|{nodes2D.nodes[3, 3].nodeData.Unit,80}|{nodes2D.nodes[3, 4].nodeData.Unit,80}");
+            Debug.Log($"{nodes2D.nodes[4, 1].nodeData.Unit,80}|{nodes2D.nodes[4, 2].nodeData.Unit,80}|{nodes2D.nodes[4, 3].nodeData.Unit,80}|{nodes2D.nodes[4, 4].nodeData.Unit,80}");
+            Debug.Log($"empty node count : {emptyNodes.Count}");
+            Debug.Log($"Undo List Count : {recordNodes.Count}");
+            Debug.Log($"Undo Chance : {undoChance}");
+            Debug.Log("==================================================");
+        }
+#endif
+        #endregion
+
+        Generated = true;
+    }
+    void GenerateObstracle()
+    {
+        //empty node controll
+        if (emptyNodes.Count == 0) return;
+
+        Moved = false;
+        int pickNum = UnityEngine.Random.Range(0, emptyNodes.Count);
+        //object create
+        Vector3 newUnitPos = new(emptyNodes[pickNum].XPos, 0.5f, -emptyNodes[pickNum].YPos);
+
+        int per = UnityEngine.Random.Range(1, 100);
+        //creat Hero 5%
+        if (per <= heroPercent)
+        {
+            GameObject instUnit = ObjectPool.Inst.ObjectPop(obstaclesUnits[(int)HumanUnit.Type.hero], newUnitPos, Quaternion.identity, null);
+            emptyNodes[pickNum].nodeData.Unit = instUnit.GetComponent<BasicUnit>();
+        }
+        //create soldier 10%
+        else if (per <= KnightPercent)
+        {
+            GameObject instUnit = ObjectPool.Inst.ObjectPop(obstaclesUnits[(int)HumanUnit.Type.knight], newUnitPos, Quaternion.identity, null);
+            emptyNodes[pickNum].nodeData.Unit = instUnit.GetComponent<BasicUnit>();
+        }
+        //create shieldman 85%
+        else
+        {
+            GameObject instUnit = ObjectPool.Inst.ObjectPop(obstaclesUnits[(int)HumanUnit.Type.sheildman], newUnitPos, Quaternion.identity, null);
+            emptyNodes[pickNum].nodeData.Unit = instUnit.GetComponent<BasicUnit>();
+        }
+        emptyNodes.RemoveAt(pickNum);
     }
     #endregion
 
-    #region gameEndroutine
-    IEnumerator EndGameCheck()
+    #region gameOverCheckRoutine
+    IEnumerator GameOverCheck()
     {
-        for (int i = 1; i < boardSize + 1; i++)
+        for (int i = 1; i < boardSize; i++)
         {
-            StartCoroutine(SearchVertical(node2Ds[i, 1], i - 1));
-            StartCoroutine(SearchHorizontal(node2Ds[1, i], i - 1));
+            for (int j = 1; j < boardSize + 1; j++)
+            {
+                if (!Check(nodes2D.nodes[j,i], nodes2D.nodes[j,i].Right) || !Check(nodes2D.nodes[i, j], nodes2D.nodes[i, j].Down))
+                {
+                    yield break;
+                }
+            }
         }
-        
-        yield return new WaitUntil(() => processed1 && processed2);
 
-        if (GameEnd)
+        yield return waitTime;
+        GameManager.Inst.MgrCallGameEnd();
+    }
+    bool Check(Node checkNord, Node compareNode)
+    {
+        BasicUnit checkUnit = checkNord.nodeData.Unit;
+        BasicUnit compareUnit = compareNode.nodeData.Unit;
+
+        if (checkUnit.GetDamage() == compareUnit.GetDamage())
         {
-            GameManager.Inst.GameEnd = true;
+            if (checkUnit.combinable) return false;//game over not yet
+            else return true;
         }
-        else
+        else return true;
+    }
+    #endregion
+
+    #region Recording & Undo
+    void RecordingNodes(LinkedNode2D targetNodes)
+    {
+        if (!Generated || undoCount == 0) return;
+
+        Generated = false;
+
+        LinkedNode2D instNodes = new LinkedNode2D(boardSize);
+
+        for (int y = 1; y < boardSize + 1; y++)
         {
-            processed1 = false;
-            processed2 = false;
+            for (int x = 1; x < boardSize + 1; x++)
+            {
+                instNodes.nodes[y,x] = new Node();
+                instNodes.nodes[y, x].nodeData = targetNodes.nodes[y, x].nodeData;
+            }
+        }
+
+        recordNodes.Add(instNodes);
+        undoChance++;
+
+        if (recordNodes.Count > undoCount + 1)
+        {
+            undoChance = undoCount + 1;
+            recordNodes.RemoveAt(0);
         }
     }
-    bool processed1 = false;
-    bool processed2 = false;
-    IEnumerator SearchVertical(Node2D node, int index)
+    void CallRecordNodes()
     {
-        bool sameDetect = false;
-        while(true)
+        if (undoCount == 0) return;
+        recordNodes.RemoveAt(undoChance - 1);
+
+        for (int y = 1; y < boardSize + 1; y++)
         {
-            if (node.Value == node.Right.Value)
+            for (int x = 1; x < boardSize + 1; x++)
             {
-                sameDetect = true;
-            }
-
-            node = node.Right;
-
-            if (node.Wall)
-            {
-                if (sameDetect) GameEnd = false; 
-                else GameEnd = true;
-
-                if (index == 3)
+                //current unit clear
+                if (nodes2D.nodes[y, x].nodeData.Unit != null)
                 {
-                    processed1 = true;
-                }
-                yield break;
-            }
+                    ObjectPool.Inst.ObjectPush(nodes2D.nodes[y, x].GetUnit());
 
-            yield return null;
-        }
-    }
-    IEnumerator SearchHorizontal(Node2D node, int index)
-    {
-        bool sameDetect = false;
-        while (true)
-        {
-            if (node.Value == node.Down.Value)
-            {
-                sameDetect = true;
-            }
-
-            node = node.Down;
-
-            if (node.Wall)
-            {
-                if (sameDetect) GameEnd = false; 
-                else GameEnd = true;
-
-                if (index == 3)
-                {
-                    processed2 = true;
+                    emptyNodes.Add(nodes2D.nodes[y, x]);
                 }
 
-                yield break;
-            }
+                //exchange
+                if (recordNodes[undoChance - 2].nodes[y, x].nodeData.Unit != null)
+                {
+                    GameObject unit = recordNodes[undoChance - 2].nodes[y, x].nodeData.Unit.gameObject;
+                    Vector3 pos = new (nodes2D.nodes[y,x].XPos, 0.5f, -nodes2D.nodes[y, x].YPos);
 
-            yield return null;
+                    GameObject instUnit = ObjectPool.Inst.ObjectPop(unit, pos, Quaternion.identity);
+                    nodes2D.nodes[y, x].nodeData.Unit = instUnit.GetComponent<BasicUnit>();
+
+                    emptyNodes.Remove(nodes2D.nodes[y, x]);
+                }
+            }
         }
+
+        undoChance--;
+        undoCount--;
+
+        GameManager.Inst.TimeStop = false;
+        UndoProcessing = false;
     }
     #endregion
 }

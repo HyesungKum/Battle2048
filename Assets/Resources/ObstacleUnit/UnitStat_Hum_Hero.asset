@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5952d9b70f1d039409b519afffd80a8c, type: 3}
+  m_Name: UnitStat_Hum_Hero
+  m_EditorClassIdentifier: 
+  damage: 2047
+  enableVfx: {fileID: 111779407002322826, guid: 37abbfa91b6fb4f419b65bacd32c1f10, type: 3}
+  enableSfx: {fileID: 8300000, guid: 5db5eaa64cb5da84a92fc3e803466a3c, type: 3}
+  downGradeVfx: {fileID: 0}
+  downGradeSfx: {fileID: 0}
+  deadVfx: {fileID: 1994311576025684880, guid: 26e5c86e0b9ab704ebbecda9d0bb94d9, type: 3}
+  deadSfx: {fileID: 7579617763936682888, guid: daeab65ee56cbaf4e803bc3074a6bd88, type: 3}

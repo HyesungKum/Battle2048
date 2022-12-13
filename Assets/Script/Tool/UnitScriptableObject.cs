@@ -10,6 +10,9 @@ public class UnitScriptableObject : ScriptableObject
     [field: SerializeField] public GameObject enableVfx;
     [field: SerializeField] public AudioClip enableSfx;
 
-    [field: SerializeField] public GameObject disableVfx;
-    [field: SerializeField] public AudioClip disableSfx; 
+    [field: SerializeField] public GameObject downGradeVfx;
+    [field: SerializeField] public GameObject downGradeSfx;
+
+    [field: SerializeField] public GameObject deadVfx;
+    [field: SerializeField] public GameObject deadSfx; 
 }

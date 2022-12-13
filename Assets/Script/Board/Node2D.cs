@@ -1,54 +1,76 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using System;
 
-public class Node2D
+[Serializable]
+public struct Data
 {
     public bool Wall { get; set; }
-    public bool Empty { get; set; }
     public bool Combined { get; set; }
-    public GameObject Unit { get; set; }
-    public int Value { get; set; }
+
+    public BasicUnit Unit { get; set; }
+    public Data(bool wall, bool combine, BasicUnit unit)
+    {
+        this.Wall = wall;
+        this.Combined = combine;
+        this.Unit = unit;
+    }
+}
+
+public class Node
+{
+    //=====================data=======================
+    public Data nodeData = new(false, false, null);
     public int XPos { get; set; }
     public int YPos { get; set; }
-    public Node2D Right { get; set; }
-    public Node2D Left { get; set; }
-    public Node2D Up { get; set; }
-    public Node2D Down { get; set; }
+    //==================connection====================
+    public Node Right { get; set; }
+    public Node Left { get; set; }
+    public Node Up { get; set; }
+    public Node Down { get; set; }
+    //================================================
 
-    public int GetUnitIndex
+    public int GetUnitIndex()
     {
-        get 
+        if (this.nodeData.Unit != null)
         {
-            int i = 0;
-            int value = this.Value;
-            while (value != 2)
-            {
-                value /= 2;
-                i++;
-            }
-            return i;
+            return this.nodeData.Unit.index;
+        }
+        else
+        {
+            Debug.Log("node2d ## get index error: 접근가능한 유닛이 없습니다.");
+            return 0;
+        }
+    }
+    public void SetWall()
+    {
+        this.nodeData.Wall = true;
+    }
+    public GameObject GetUnit()
+    {
+        if (this.nodeData.Unit != null)
+        {
+            GameObject unit = this.nodeData.Unit.gameObject;
+            this.nodeData.Unit = null;
+
+            return unit;
+        }
+        else
+        {
+            Debug.Log("node2d ## get unit error : 접근가능한 유닛이 없습니다.");
+            return null;
         }
     }
 
-    public Node2D()
+    public Node()
+    { }
+    public Node(bool value)
     {
-        this.Empty = true;
+        this.nodeData.Wall = value;
     }
-    public Node2D(int value)
+    public Node(int xPos, int yPos, Node right, Node left, Node up, Node down)
     {
-        this.Value = value;
-        this.Empty = false;
-    }
-    public Node2D(bool value)
-    {
-        this.Wall = value;
-        this.Empty = false;
-    }
-    public Node2D(int value, int xPos, int yPos, Node2D right, Node2D left, Node2D up, Node2D down)
-    {
-        this.Value = value;
-
         this.XPos = xPos;
         this.YPos = yPos;
 
@@ -57,7 +79,16 @@ public class Node2D
         this.Up = up;
         this.Down = down;
 
-        this.Wall = false;
-        this.Empty = false;
+        this.nodeData.Wall = false;
+    }
+}
+
+[Serializable]
+public class LinkedNode2D
+{
+    public Node[,] nodes = null;
+    public LinkedNode2D(int size)
+    {
+        nodes = new Node[size + 2, size + 2];
     }
 }
