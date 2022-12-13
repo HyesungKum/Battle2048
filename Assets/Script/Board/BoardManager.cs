@@ -53,6 +53,7 @@ public class BoardManager : MonoBehaviour
     [Tooltip("Default Value 0")]
     [SerializeField] int ForcedUnitIndex = 0;
     [SerializeField] bool NoGen = false;
+    [SerializeField] bool InfiniteUndo = false;
     #endif
 
     //===================node Data==============================
@@ -182,22 +183,18 @@ public class BoardManager : MonoBehaviour
             if (Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow))
             {
                 SearchAndGenerateR();
-                RecordingNodes(nodes2D);
             }
             else if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow))
             {
                 SearchAndGenerateL();
-                RecordingNodes(nodes2D);
             }
             else if (Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow))
             {
                 SearchAndGenerateU();
-                RecordingNodes(nodes2D);
             }
             else if (Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow))
             {
                 SearchAndGenerateD();
-                RecordingNodes(nodes2D);
             }
         }
 
@@ -205,6 +202,15 @@ public class BoardManager : MonoBehaviour
         {
             if (recordNodes.Count > 1)
             {
+                #region testmode
+                #if UNITY_EDITOR
+                if (InfiniteUndo)
+                {
+                    CallRecordNodes();
+                    return; 
+                }
+                #endif
+                #endregion
                 GameManager.Inst.TimeStop = true;
 
                 ChanceLight[lightCount].SetActive(false);
@@ -650,7 +656,7 @@ public class BoardManager : MonoBehaviour
                         else if (humanUnit.GetDamage() >= monsterUnit.GetDamage())
                         {
                             int unitIndex = monNode.GetUnitIndex() - 1;
-                            Vector3 monPos = new(monNode.XPos, 0.5f, monNode.YPos);
+                            Vector3 monPos = new(monNode.XPos, 0.5f, -monNode.YPos);
 
                             monsterUnit.DownGradeProd();
 
@@ -666,13 +672,14 @@ public class BoardManager : MonoBehaviour
                         else
                         {
                             int unitIndex = monNode.GetUnitIndex() - 1;
-                            Vector3 Pos = new(CompareNode.XPos,0.5f,CompareNode.YPos);
+                            //= monsterUnit. index -1;
+                            Vector3 Pos = new(CompareNode.XPos,0.5f,-CompareNode.YPos);
 
                             monsterUnit.DownGradeProd();
                             humanUnit.DeadProd();
 
-                            ObjectPool.Inst.ObjectPush(targetNode.GetUnit());
-                            ObjectPool.Inst.ObjectPush(CompareNode.GetUnit());
+                            ObjectPool.Inst.ObjectPush(monNode.GetUnit());
+                            ObjectPool.Inst.ObjectPush(humNode.GetUnit());
                             
                             GameObject instUnit = ObjectPool.Inst.ObjectPop(units[unitIndex].gameObject, Pos, Quaternion.identity, null);
                             CompareNode.nodeData.Unit = instUnit.GetComponent<BasicUnit>();
@@ -689,13 +696,9 @@ public class BoardManager : MonoBehaviour
                     break;
                 case HumanUnit.Type.hero:
                     {
-                        Debug.Log($"monster {monsterUnit.GetDamage()}");
-                        Debug.Log($"human {humanUnit.GetDamage()}");
-
                         //kill large monster
                         if (monsterUnit.GetDamage() >= humanUnit.GetDamage())
                         {
-                            Debug.Log("hi");
                             humanUnit.DeadProd();
                             monsterUnit.DeadProd();
 
@@ -903,6 +906,16 @@ public class BoardManager : MonoBehaviour
 
         recordNodes.Add(instNodes);
         undoChance++;
+
+        #region testmode
+        #if UNITY_EDITOR
+        if (InfiniteUndo)
+        {
+            undoCount = int.MaxValue;
+            return;    
+        }
+        #endif
+        #endregion
 
         if (recordNodes.Count > undoCount + 1)
         {

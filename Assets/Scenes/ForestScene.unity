@@ -2345,9 +2345,10 @@ MonoBehaviour:
   heroPercent: 0
   KnightPercent: 100
   targetUnit: {fileID: 0}
-  showNodeUnit: 0
-  ForcedUnitIndex: 7
+  showNodeUnit: 1
+  ForcedUnitIndex: 6
   NoGen: 0
+  InfiniteUndo: 1
 --- !u!4 &570871081
 Transform:
   m_ObjectHideFlags: 0
