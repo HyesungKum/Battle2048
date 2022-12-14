@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class HumanUnit : BasicUnit
 {   
-    public enum Type
+    public enum HumanType
     {
         sheildman,
         knight,
@@ -12,10 +12,31 @@ public class HumanUnit : BasicUnit
         max
     }
 
-    public Type type;
+    public HumanType Type;
 
     protected override void Awake()
     {
         base.Awake();
+    }
+
+    //public override bool Compare(BasicUnit compUnit)
+    //{
+    //    if (spcies == compUnit.spcies)
+    //    {
+    //        if (GetDanger == compUnit.GetDanger)
+    //        {
+
+    //        }
+    //        else
+    //        {
+                
+    //        }
+    //    }
+    //    return true;
+    //}
+
+    private BasicUnit UpGrade()
+    {
+        return (BasicUnit)GetComponent<BasicUnit>();
     }
 }

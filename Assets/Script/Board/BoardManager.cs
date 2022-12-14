@@ -533,189 +533,200 @@ public class BoardManager : MonoBehaviour
         BasicUnit targetUnit = targetNode.nodeData.Unit;
         BasicUnit CompareUnit = CompareNode.nodeData.Unit;
 
-        if (!targetUnit.combinable) return;
-
-        if (targetUnit.spcies == CompareUnit.spcies)
+        if (targetUnit.CompareCom(CompareUnit))
         {
-            //combine
-            if (targetUnit.GetDamage() == CompareUnit.GetDamage())
-            {
-                if (targetUnit.LastUnit) return;
 
-                int unitIndex = CompareNode.GetUnitIndex() + 1;
-
-                if (unitIndex == units.Count - 1) GameManager.Inst.ClearEvent(); //clear when last index unit appear
-
-                ObjectPool.Inst.ObjectPush(targetNode.GetUnit());
-                ObjectPool.Inst.ObjectPush(CompareNode.GetUnit());
-
-                Vector3 newUnitPos = new(CompareNode.XPos, 0.5f, -CompareNode.YPos);
-                GameObject unitObj;
-
-                //select combined unit species 
-                if (targetUnit.spcies == BasicUnit.Spcies.Monster)
-                {
-                    unitObj = units[unitIndex].gameObject;
-                    GameManager.Inst.MgrCallGameScore(units[unitIndex].GetDamage());
-                }
-                else unitObj = obstaclesUnits[unitIndex];
-
-                GameObject instUnit = ObjectPool.Inst.ObjectPop(unitObj, newUnitPos, Quaternion.identity, null);
-                CompareNode.nodeData.Unit = instUnit.GetComponent<BasicUnit>();
-
-                emptyNodes.Remove(CompareNode);
-                emptyNodes.Add(targetNode);
-
-                Moved = true;
-                CompareNode.nodeData.Combined = true;
-            }
-            else return; //if same spcies, not same damage return
         }
         else
         {
-            #region dummy node data save
-            Node humNode;
-            Node monNode;
-            HumanUnit humanUnit;
-            MonsterUnit monsterUnit;
-
-            //unit apply each spcies
-            if (targetUnit.spcies == BasicUnit.Spcies.Human)
-            {
-                humNode = targetNode;
-                monNode = CompareNode;
-
-                humanUnit = (HumanUnit)targetUnit;
-                monsterUnit = (MonsterUnit)CompareUnit;
-            }
-            else
-            {
-                humNode = CompareNode;
-                monNode = targetNode;
-
-                monsterUnit = (MonsterUnit)targetUnit;
-                humanUnit = (HumanUnit)CompareUnit;
-            }
-            #endregion
-
-            switch (humanUnit.type)
-            {
-                case HumanUnit.Type.sheildman:
-                    {
-                        if (humanUnit.GetDamage() >= monsterUnit.GetDamage()) return;
-                        //die
-                        else
-                        {
-                            monsterUnit.gameObject.transform.position = CompareUnit.transform.position;
-                            humanUnit.gameObject.transform.position = CompareUnit.transform.position;
-
-                            humanUnit.DeadProd();
-
-                            Data dummyHumData = humNode.nodeData;
-                            Data dummyMonData = monNode.nodeData;
-
-                            //human dead monster alive
-                            CompareNode.nodeData = dummyMonData;
-                            targetNode.nodeData = dummyHumData;
-
-                            ObjectPool.Inst.ObjectPush(targetNode.GetUnit());
-
-                            emptyNodes.Remove(CompareNode);
-                            emptyNodes.Add(targetNode);
-
-                            Moved = true;
-                            CompareNode.nodeData.Combined = true;
-                        }
-                    }
-                    break;
-                case HumanUnit.Type.knight:
-                    {
-                        //kill monster unit damage 2
-                        if (monsterUnit.GetDamage() == 2)
-                        {
-                            monsterUnit.gameObject.transform.position = CompareUnit.transform.position;
-                            humanUnit.gameObject.transform.position = CompareUnit.transform.position;
-
-                            monsterUnit.DeadProd();
-
-                            Data dummyHumData = humNode.nodeData;
-                            Data dummyMonData = monNode.nodeData;
-
-                            CompareNode.nodeData = dummyHumData;
-                            targetNode.nodeData = dummyMonData;
-
-                            ObjectPool.Inst.ObjectPush(targetNode.GetUnit());
-
-                            emptyNodes.Remove(CompareNode);
-                            emptyNodes.Add(targetNode);
-
-                            Moved = true;
-                            CompareNode.nodeData.Combined = true;
-                        }
-                        //divide unit and alive
-                        else if (humanUnit.GetDamage() >= monsterUnit.GetDamage())
-                        {
-                            int unitIndex = monNode.GetUnitIndex() - 1;
-                            Vector3 monPos = new(monNode.XPos, 0.5f, -monNode.YPos);
-
-                            monsterUnit.DownGradeProd();
-
-                            ObjectPool.Inst.ObjectPush(monNode.GetUnit());
-                            GameObject instUnit = ObjectPool.Inst.ObjectPop(units[unitIndex].gameObject, monPos, Quaternion.identity, null);
-                            monNode.nodeData.Unit = instUnit.GetComponent<BasicUnit>();
-
-                            monNode.nodeData.Combined = true;
-                            humNode.nodeData.Combined = true;
-                            Moved = true;
-                        }
-                        //divide monster unit and die
-                        else
-                        {
-                            int unitIndex = monNode.GetUnitIndex() - 1;
-                            //= monsterUnit. index -1;
-                            Vector3 Pos = new(CompareNode.XPos,0.5f,-CompareNode.YPos);
-
-                            monsterUnit.DownGradeProd();
-                            humanUnit.DeadProd();
-
-                            ObjectPool.Inst.ObjectPush(monNode.GetUnit());
-                            ObjectPool.Inst.ObjectPush(humNode.GetUnit());
-                            
-                            GameObject instUnit = ObjectPool.Inst.ObjectPop(units[unitIndex].gameObject, Pos, Quaternion.identity, null);
-                            CompareNode.nodeData.Unit = instUnit.GetComponent<BasicUnit>();
-
-                            //empty node controll
-                            emptyNodes.Remove(targetNode);
-                            emptyNodes.Add(CompareNode);
-
-                            //flags
-                            CompareNode.nodeData.Combined = true;
-                            Moved = true;
-                        }
-                    }
-                    break;
-                case HumanUnit.Type.hero:
-                    {
-                        //kill large monster
-                        if (monsterUnit.GetDamage() >= humanUnit.GetDamage())
-                        {
-                            humanUnit.DeadProd();
-                            monsterUnit.DeadProd();
-
-                            ObjectPool.Inst.ObjectPush(targetNode.GetUnit());
-                            ObjectPool.Inst.ObjectPush(CompareNode.GetUnit());
-
-                            emptyNodes.Remove(targetNode);
-                            emptyNodes.Remove(CompareNode);
-
-                            CompareNode.nodeData.Combined = true;
-                            Moved = true;
-                        }
-                        else return; //egnore
-                    }
-                    break;
-            }
+            
         }
+
+        #region legacy
+        //if (!targetUnit.combinable) return;
+
+        //if (targetUnit.spcies == CompareUnit.spcies)
+        //{
+        //    //combine
+        //    if (targetUnit.GetDanger == CompareUnit.GetDanger)
+        //    {
+        //        if (targetUnit.LastUnit) return;
+
+        //        int unitIndex = CompareNode.GetUnitIndex() + 1;
+
+        //        if (unitIndex == units.Count - 1) GameManager.Inst.ClearEvent(); //clear when last index unit appear
+
+        //        ObjectPool.Inst.ObjectPush(targetNode.GetUnit());
+        //        ObjectPool.Inst.ObjectPush(CompareNode.GetUnit());
+
+        //        Vector3 newUnitPos = new(CompareNode.XPos, 0.5f, -CompareNode.YPos);
+        //        GameObject unitObj;
+
+        //        //select combined unit species 
+        //        if (targetUnit.spcies == BasicUnit.Spcies.Monster)
+        //        {
+        //            unitObj = units[unitIndex].gameObject;
+        //            GameManager.Inst.MgrCallGameScore(units[unitIndex].GetDanger);
+        //        }
+        //        else unitObj = obstaclesUnits[unitIndex];
+
+        //        GameObject instUnit = ObjectPool.Inst.ObjectPop(unitObj, newUnitPos, Quaternion.identity, null);
+        //        CompareNode.nodeData.Unit = instUnit.GetComponent<BasicUnit>();
+
+        //        emptyNodes.Remove(CompareNode);
+        //        emptyNodes.Add(targetNode);
+
+        //        Moved = true;
+        //        CompareNode.nodeData.Combined = true;
+        //    }
+        //    else return; //if same spcies, not same damage return
+        //}
+        //else
+        //{
+        //    #region dummy node data save
+        //    Node humNode;
+        //    Node monNode;
+        //    HumanUnit humanUnit;
+        //    MonsterUnit monsterUnit;
+
+        //    //unit apply each spcies
+        //    if (targetUnit.spcies == BasicUnit.Spcies.Human)
+        //    {
+        //        humNode = targetNode;
+        //        monNode = CompareNode;
+
+        //        humanUnit = (HumanUnit)targetUnit;
+        //        monsterUnit = (MonsterUnit)CompareUnit;
+        //    }
+        //    else
+        //    {
+        //        humNode = CompareNode;
+        //        monNode = targetNode;
+
+        //        monsterUnit = (MonsterUnit)targetUnit;
+        //        humanUnit = (HumanUnit)CompareUnit;
+        //    }
+        //    #endregion
+
+        //    switch (humanUnit.Type)
+        //    {
+        //        case HumanUnit.HumanType.sheildman:
+        //            {
+        //                if (humanUnit.GetDanger >= monsterUnit.GetDanger) return;
+        //                //die
+        //                else
+        //                {
+        //                    monsterUnit.gameObject.transform.position = CompareUnit.transform.position;
+        //                    humanUnit.gameObject.transform.position = CompareUnit.transform.position;
+
+        //                    humanUnit.DeadProd();
+
+        //                    Data dummyHumData = humNode.nodeData;
+        //                    Data dummyMonData = monNode.nodeData;
+
+        //                    //human dead monster alive
+        //                    CompareNode.nodeData = dummyMonData;
+        //                    targetNode.nodeData = dummyHumData;
+
+        //                    ObjectPool.Inst.ObjectPush(targetNode.GetUnit());
+
+        //                    emptyNodes.Remove(CompareNode);
+        //                    emptyNodes.Add(targetNode);
+
+        //                    Moved = true;
+        //                    CompareNode.nodeData.Combined = true;
+        //                }
+        //            }
+        //            break;
+        //        case HumanUnit.HumanType.knight:
+        //            {
+        //                //kill monster unit damage 2
+        //                if (monsterUnit.GetDanger == 2)
+        //                {
+        //                    monsterUnit.gameObject.transform.position = CompareUnit.transform.position;
+        //                    humanUnit.gameObject.transform.position = CompareUnit.transform.position;
+
+        //                    monsterUnit.DeadProd();
+
+        //                    Data dummyHumData = humNode.nodeData;
+        //                    Data dummyMonData = monNode.nodeData;
+
+        //                    CompareNode.nodeData = dummyHumData;
+        //                    targetNode.nodeData = dummyMonData;
+
+        //                    ObjectPool.Inst.ObjectPush(targetNode.GetUnit());
+
+        //                    emptyNodes.Remove(CompareNode);
+        //                    emptyNodes.Add(targetNode);
+
+        //                    Moved = true;
+        //                    CompareNode.nodeData.Combined = true;
+        //                }
+        //                //divide unit and alive
+        //                else if (humanUnit.GetDanger >= monsterUnit.GetDanger)
+        //                {
+        //                    int unitIndex = monNode.GetUnitIndex() - 1;
+        //                    Vector3 monPos = new(monNode.XPos, 0.5f, -monNode.YPos);
+
+        //                    monsterUnit.DownGradeProd();
+
+        //                    ObjectPool.Inst.ObjectPush(monNode.GetUnit());
+        //                    GameObject instUnit = ObjectPool.Inst.ObjectPop(units[unitIndex].gameObject, monPos, Quaternion.identity, null);
+        //                    monNode.nodeData.Unit = instUnit.GetComponent<BasicUnit>();
+
+        //                    monNode.nodeData.Combined = true;
+        //                    humNode.nodeData.Combined = true;
+        //                    Moved = true;
+        //                }
+        //                //divide monster unit and die
+        //                else
+        //                {
+        //                    int unitIndex = monNode.GetUnitIndex() - 1;
+        //                    //= monsterUnit. index -1;
+        //                    Vector3 Pos = new(CompareNode.XPos,0.5f,-CompareNode.YPos);
+
+        //                    monsterUnit.DownGradeProd();
+        //                    humanUnit.DeadProd();
+
+        //                    ObjectPool.Inst.ObjectPush(monNode.GetUnit());
+        //                    ObjectPool.Inst.ObjectPush(humNode.GetUnit());
+
+        //                    GameObject instUnit = ObjectPool.Inst.ObjectPop(units[unitIndex].gameObject, Pos, Quaternion.identity, null);
+        //                    CompareNode.nodeData.Unit = instUnit.GetComponent<BasicUnit>();
+
+        //                    //empty node controll
+        //                    emptyNodes.Remove(targetNode);
+        //                    emptyNodes.Add(CompareNode);
+
+        //                    //flags
+        //                    CompareNode.nodeData.Combined = true;
+        //                    Moved = true;
+        //                }
+        //            }
+        //            break;
+        //        case HumanUnit.HumanType.hero:
+        //            {
+        //                //kill large monster
+        //                if (monsterUnit.GetDanger >= humanUnit.GetDanger)
+        //                {
+        //                    humanUnit.DeadProd();
+        //                    monsterUnit.DeadProd();
+
+        //                    ObjectPool.Inst.ObjectPush(targetNode.GetUnit());
+        //                    ObjectPool.Inst.ObjectPush(CompareNode.GetUnit());
+
+        //                    emptyNodes.Remove(targetNode);
+        //                    emptyNodes.Remove(CompareNode);
+
+        //                    CompareNode.nodeData.Combined = true;
+        //                    Moved = true;
+        //                }
+        //                else return; //egnore
+        //            }
+        //            break;
+        //    }
+        //}
+        #endregion
     }
     #endregion
 
@@ -836,19 +847,19 @@ public class BoardManager : MonoBehaviour
         //creat Hero 5%
         if (per <= heroPercent)
         {
-            GameObject instUnit = ObjectPool.Inst.ObjectPop(obstaclesUnits[(int)HumanUnit.Type.hero], newUnitPos, Quaternion.identity, null);
+            GameObject instUnit = ObjectPool.Inst.ObjectPop(obstaclesUnits[(int)HumanUnit.HumanType.hero], newUnitPos, Quaternion.identity, null);
             emptyNodes[pickNum].nodeData.Unit = instUnit.GetComponent<BasicUnit>();
         }
         //create soldier 10%
         else if (per <= KnightPercent)
         {
-            GameObject instUnit = ObjectPool.Inst.ObjectPop(obstaclesUnits[(int)HumanUnit.Type.knight], newUnitPos, Quaternion.identity, null);
+            GameObject instUnit = ObjectPool.Inst.ObjectPop(obstaclesUnits[(int)HumanUnit.HumanType.knight], newUnitPos, Quaternion.identity, null);
             emptyNodes[pickNum].nodeData.Unit = instUnit.GetComponent<BasicUnit>();
         }
         //create shieldman 85%
         else
         {
-            GameObject instUnit = ObjectPool.Inst.ObjectPop(obstaclesUnits[(int)HumanUnit.Type.sheildman], newUnitPos, Quaternion.identity, null);
+            GameObject instUnit = ObjectPool.Inst.ObjectPop(obstaclesUnits[(int)HumanUnit.HumanType.sheildman], newUnitPos, Quaternion.identity, null);
             emptyNodes[pickNum].nodeData.Unit = instUnit.GetComponent<BasicUnit>();
         }
         emptyNodes.RemoveAt(pickNum);
@@ -877,7 +888,7 @@ public class BoardManager : MonoBehaviour
         BasicUnit checkUnit = checkNord.nodeData.Unit;
         BasicUnit compareUnit = compareNode.nodeData.Unit;
 
-        if (checkUnit.GetDamage() == compareUnit.GetDamage())
+        if (checkUnit.GetDanger == compareUnit.GetDanger)
         {
             if (checkUnit.combinable) return false;//game over not yet
             else return true;

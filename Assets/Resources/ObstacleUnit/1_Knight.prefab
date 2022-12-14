@@ -384,10 +384,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   UnitData: {fileID: 11400000, guid: eb6d5aaf40ba92b438b48020a827c53f, type: 2}
-  combinable: 1
   spcies: 0
   index: 1
-  type: 1
+  combinable: 1
+  LastUnit: 0
+  Type: 1
 --- !u!1 &6734092971198007737
 GameObject:
   m_ObjectHideFlags: 0

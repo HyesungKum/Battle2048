@@ -2345,7 +2345,7 @@ MonoBehaviour:
   heroPercent: 0
   KnightPercent: 100
   targetUnit: {fileID: 0}
-  showNodeUnit: 1
+  showNodeUnit: 0
   ForcedUnitIndex: 6
   NoGen: 0
   InfiniteUndo: 1
