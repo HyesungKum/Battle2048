@@ -579,7 +579,7 @@ public class BoardManager : MonoBehaviour
         //        Moved = true;
         //        CompareNode.nodeData.Combined = true;
         //    }
-        //    else return; //if same spcies, not same damage return
+        //    else return; //if same spcies, not same Damage return
         //}
         //else
         //{
@@ -640,7 +640,7 @@ public class BoardManager : MonoBehaviour
         //            break;
         //        case HumanUnit.HumanType.knight:
         //            {
-        //                //kill monster unit damage 2
+        //                //kill monster unit Damage 2
         //                if (monsterUnit.GetDanger == 2)
         //                {
         //                    monsterUnit.gameObject.transform.position = CompareUnit.transform.position;

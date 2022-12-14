@@ -12,10 +12,11 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5952d9b70f1d039409b519afffd80a8c, type: 3}
   m_Name: UnitStat_Mon_2
   m_EditorClassIdentifier: 
-  damage: 2
-  enableVfx: {fileID: 0}
-  enableSfx: {fileID: 0}
-  downGradeVfx: {fileID: 5028697271594453590, guid: 73130603ae9484948a9e6d0f11352139, type: 3}
-  downGradeSfx: {fileID: 5117468312594337648, guid: e547c277b3c599d4d913a1394c0c5be8, type: 3}
-  deadVfx: {fileID: 1994311576025684880, guid: 26e5c86e0b9ab704ebbecda9d0bb94d9, type: 3}
-  deadSfx: {fileID: 7579617763936682888, guid: 6eac27f07afd29248bac01706aed4f30, type: 3}
+  UpperUnit: {fileID: 3606311622713886862, guid: 832c5438749ac4249864067b5a73bf54, type: 3}
+  Damage: 2
+  EnableVfx: {fileID: 0}
+  EnableSfx: {fileID: 8300000, guid: 6fc3900f29833a94c902fb917044ef80, type: 3}
+  DownGradeVfx: {fileID: 0}
+  DownGradeSfx: {fileID: 0}
+  DeadVfx: {fileID: 1994311576025684880, guid: 26e5c86e0b9ab704ebbecda9d0bb94d9, type: 3}
+  DeadSfx: {fileID: 7579617763936682888, guid: 6eac27f07afd29248bac01706aed4f30, type: 3}

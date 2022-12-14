@@ -27,11 +27,11 @@ public abstract class BasicUnit : MonoBehaviour
         {
             if (UnitData != null)
             {
-                return this.UnitData.damage;
+                return this.UnitData.Damage;
             }
             else
             {
-                Debug.Log("basic unit get damage error ## unit data null");
+                Debug.Log("basic unit get Damage error ## unit data null");
                 return 0;
             }
         }
@@ -49,38 +49,38 @@ public abstract class BasicUnit : MonoBehaviour
     //============================common function=============================
     protected void EnableProd()
     {
-        if (UnitData.enableVfx != null)
+        if (UnitData.EnableVfx != null)
         {
-            ObjectPool.Inst.ObjectPop(UnitData.enableVfx, this.transform.position + (Vector3.up * 0.5f), Quaternion.identity, this.transform);
+            ObjectPool.Inst.ObjectPop(UnitData.EnableVfx, this.transform.position + (Vector3.up * 0.5f), Quaternion.identity, this.transform);
         }
 
-        if (UnitData.enableSfx != null)
+        if (UnitData.EnableSfx != null)
         {
-            AudioSource.clip = UnitData.enableSfx;
+            AudioSource.clip = UnitData.EnableSfx;
             AudioSource.Play();
         }
     }
     protected void DownGradeProd()
     {
-        if (UnitData.downGradeVfx != null)
+        if (UnitData.DownGradeVfx != null)
         {
-            ObjectPool.Inst.ObjectPop(UnitData.downGradeVfx, this.transform.position + (Vector3.up * 0.5f), Quaternion.identity, null);
+            ObjectPool.Inst.ObjectPop(UnitData.DownGradeVfx, this.transform.position + (Vector3.up * 0.5f), Quaternion.identity, null);
         }
-        if (UnitData.downGradeSfx != null)
+        if (UnitData.DownGradeSfx != null)
         {
-            ObjectPool.Inst.ObjectPop(UnitData.downGradeSfx, this.transform.position + (Vector3.up * 0.5f), Quaternion.identity, null);
+            ObjectPool.Inst.ObjectPop(UnitData.DownGradeSfx, this.transform.position + (Vector3.up * 0.5f), Quaternion.identity, null);
         }
     }
     protected void DeadProd()
     {
-        if (UnitData.deadVfx != null)
+        if (UnitData.DeadVfx != null)
         {
-            ObjectPool.Inst.ObjectPop(UnitData.deadVfx, this.transform.position + (Vector3.up * 0.5f), Quaternion.identity);
+            ObjectPool.Inst.ObjectPop(UnitData.DeadVfx, this.transform.position + (Vector3.up * 0.5f), Quaternion.identity);
         }
 
-        if (UnitData.deadSfx != null)
+        if (UnitData.DeadSfx != null)
         {
-            ObjectPool.Inst.ObjectPop(UnitData.deadSfx, this.transform.position + (Vector3.up * 0.5f), Quaternion.identity);
+            ObjectPool.Inst.ObjectPop(UnitData.DeadSfx, this.transform.position + (Vector3.up * 0.5f), Quaternion.identity);
         }
     }
     /// <summary>
@@ -106,9 +106,6 @@ public abstract class BasicUnit : MonoBehaviour
             return false;
         }
     }
-    public BasicUnit Trans(BasicUnit targetUnit)
-    {
-        return targetUnit;
-    }
     //============================uncommon function===========================
+    public abstract BasicUnit CompareReturn();
 }
